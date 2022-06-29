@@ -8,7 +8,7 @@ from typing import Tuple
 @dataclass
 class Transform:
     pos: Tuple[float, float, float]
-    rpy: Tuple[float, float, float]
+    rot: Tuple[Tuple[float, float, float], float]
 
 
 def create_mesh(output_file: pathlib.Path, model: pathlib.Path, transform: Transform, resolution: float):
@@ -22,6 +22,7 @@ def create_mesh(output_file: pathlib.Path, model: pathlib.Path, transform: Trans
     gmsh.model.add("Wind Tunnel")
 
     model_step = gmsh.model.occ.importShapes(str(model), True)
+    gmsh.model.occ.rotate(model_step, 0, 0, 0, transform.rot[0][0], transform.rot[0][1], transform.rot[0][2], transform.rot[1])
     gmsh.model.occ.translate(model_step, transform.pos[0], transform.pos[1], transform.pos[2])
     model = model_step[0][1]
 
@@ -38,7 +39,7 @@ def create_mesh(output_file: pathlib.Path, model: pathlib.Path, transform: Trans
     model_min_frontal_extent = min(model_extents[0], model_extents[2])
     model_frontal_area = model_extents[0] * model_extents[2]
 
-    enclosure_frontal_extent = math.sqrt(model_frontal_area / 2) * 16
+    enclosure_frontal_extent = max([2*model_extents[0], 2*model_extents[2], math.sqrt(model_frontal_area / 2) * 36])
     enclosure_x = (-enclosure_frontal_extent/2, enclosure_frontal_extent/2)
     enclosure_y = (model_z[0] - 1.5*enclosure_frontal_extent, model_z[1] + 0.75*enclosure_frontal_extent)
     enclosure_z = (0, enclosure_frontal_extent/2)
@@ -107,6 +108,16 @@ def create_mesh(output_file: pathlib.Path, model: pathlib.Path, transform: Trans
 
     tag_model_group = gmsh.model.addPhysicalGroup(2, tag_models)
     gmsh.model.setPhysicalName(2, tag_model_group, "model")
+
+    edges = gmsh.model.getEntities(dim=1)
+    tag_model_edges = []
+    for edge in edges:
+        tag_edge = edge[1]
+        (mx, my, mz) = gmsh.model.occ.getCenterOfMass(1, tag_edge)
+        if enclosure_x[0] < mx and mx < enclosure_x[1]\
+            and enclosure_y[0] < my and my < enclosure_y[1]\
+            and enclosure_z[0] < mz and mz < enclosure_z[1]:
+            tag_model_edges.append(tag_edge)
 
     # set mesh sizes
     distance_from_model = gmsh.model.mesh.field.add("Distance")

@@ -66,7 +66,7 @@ def make_boundaries(field_classes, field_dimensions, field_internals, field_boun
 # System dicts
 #-------------------------------------------------------------------------------
 
-def create_control_dict(iterations):
+def create_control_dict(iterations, pressure, cofr, rho):
     return FoamFile(
         make_header(location="system", object="controlDict"),
         {
@@ -86,6 +86,17 @@ def create_control_dict(iterations):
             "timePrecision": 6,
             "graphFormat": "raw",
             "runtTimeModifiable": "true",
+            "functions": {
+                "modelForces": {
+                    "type": "forces",
+                    "libs": ['"libforces.so"'],
+                    "patches": ["model"],
+                    "pRef": pressure,
+                    "CofR": cofr,
+                    "rho": "rhoInf",
+                    "rhoInf": rho,
+                }
+            }
         }
     )
 
@@ -124,7 +135,7 @@ fvSolution = FoamFile(
                 "U": 0.4,
                 "k": 0.35,
                 "omega": 0.35,
-                "p": 0.8,
+                "p": 0.7,
             }
         }
     }
@@ -320,10 +331,10 @@ class OpenFoamCase:
             print("\n")
 
 
-def create_openfoam_case(iterations: int, pressure: float, velocity: Sequence[float], parallel: int = 1):
+def create_openfoam_case(iterations: int, pressure: float, velocity: Sequence[float], parallel: int = 1, cofr=[0, 0, 0], rho=1.2041):
     case = OpenFoamCase()
 
-    case.add_file(create_control_dict(iterations))
+    case.add_file(create_control_dict(iterations, pressure=pressure, cofr=cofr, rho=rho))
     case.add_file(fvSolution)
     case.add_file(fvSchemes)
     case.add_file(create_decompose_dict(parallel))
